@@ -1,0 +1,24 @@
+_sw_uart_send_char: CODE, 3937 0 42
+___awdiv: CODE, 1435 0 109
+_strcpy: CODE, 3896 0 41
+_configure_gps: CODE, 1112 0 162
+_abs: CODE, 3711 0 25
+i1___lwdiv: CODE, 1784 0 70
+___awmod: CODE, 1544 0 96
+_main: CODE, 886 0 226
+i1_strcpy: CODE, 3826 0 34
+i1_start_panicing: CODE, 1919 0 64
+i1___lwmod: CODE, 1983 0 62
+___lwdiv: CODE, 1640 0 73
+i1_uart_send_str: CODE, 3979 0 56
+_isr: CODE, 4 0 360
+_sprintf: CODE, 367 0 260
+i1_sprintf: CODE, 627 0 259
+_start_panicing: CODE, 1713 0 71
+___lwmod: CODE, 1854 0 65
+_read_ad: CODE, 3736 0 26
+_uart_send_str: CODE, 4035 0 61
+_sw_uart_send_bit: CODE, 3696 0 15
+___wmul: CODE, 3860 0 36
+_sw_uart_send_str: CODE, 3793 0 33
+Total: 2246
