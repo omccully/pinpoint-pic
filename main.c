@@ -3,17 +3,18 @@
  * Author: Pinpoint
  *
  * Created on March 22, 2017, 12:47 PM
- * Last Updated on March 27, 2017, 8:43 PM
+ * Last Updated on March 28, 2017, 8:17 PM
  * 
- * 
- * RA0/C12IN0- - microphone
- * RA1/AN1 - accelerometer Z
- * RA2/AN2 - accelerometer Y
- * RB3/AN3 - accelerometer X
- * RB0 - button (normally high)
- * RB1 - hardware RX (to GPS TX)
- * RB2 - hardware TX (to transceiver RX)
- * RB3 - software TX (to GPS RX)
+ * Pin assignments:
+ *  http://ww1.microchip.com/downloads/en/DeviceDoc/41391D.pdf
+ *  RA0/C12IN0- - microphone
+ *  RA1/AN1 - accelerometer Z
+ *  RA2/AN2 - accelerometer Y
+ *  RA3/AN3 - accelerometer X
+ *  RB0 - button (normally high)
+ *  RB1 - hardware RX (to GPS TX)
+ *  RB2 - hardware TX (to transceiver RX)
+ *  RB3 - software TX (to GPS RX)
  */
 
 #include <stdio.h>
@@ -28,11 +29,11 @@
 #define ALERT_BUFFER_SIZE 16
 
 // microphone panic voltage
-#define MP_PANIC_V 1.5
+#define MP_PANIC_V 2.0
 
 // accelerometer panic voltage
 #define AC_PANIC_V 2.0
-#define AC_PANIC_SUM 50
+#define AC_PANIC_SUM 80
 
 #define DACR_INIT min(0b1111, (unsigned char)((MP_PANIC_V / 3.3) * 32))
 #define AD_PANIC_VAL min(0xFF, (unsigned char)((AC_PANIC_V / 3.3) * 256))   
@@ -89,30 +90,36 @@ static void interrupt isr(void) {
         
         nmea_buffer_ready = 0;
         nmea_buffer[nmea_buffer_index] = RCREG;
-        if(nmea_buffer[nmea_buffer_index] == '\n' || 
+        if(nmea_buffer[nmea_buffer_index] == '$') {
+            nmea_buffer[0] = '$';
+            nmea_buffer_index = 1;
+        } else if(nmea_buffer[nmea_buffer_index] == '\n' || 
                 nmea_buffer[nmea_buffer_index] == '\r' ||
                 nmea_buffer[nmea_buffer_index] == '\0' ||
                 nmea_buffer_index + 3 >= MAX_BUFFER_SIZE) {
             // nmea string ended, so it's ready to send
             // whether or not it ends with \r\n\0, it should work
-            
-            // must add null character at end of the string
-            nmea_buffer[nmea_buffer_index + 0] = '\r'; 
-            nmea_buffer[nmea_buffer_index + 1] = '\n'; 
-            nmea_buffer[nmea_buffer_index + 2] = '\0'; 
-            
-            nmea_buffer_index = 0; // for receiving the next NMEA string
-            
-            if(send_buffer_locked) {
-                // there's already a string being sent by the UART, so
-                // set the flag so that the TXIF interrupt will send out
-                // this string as soon as it's able to.
-                nmea_buffer_ready = 1;
+            if(nmea_buffer_index < 3) {
+                nmea_buffer_index = 0; // restart string
             } else {
-                // the UART isn't busy, so the NMEA string can be sent now
-                uart_send_str(nmea_buffer);
-                nmea_buffer_ready = 0;
-            }
+                // must add null character at end of the string
+                nmea_buffer[nmea_buffer_index + 0] = '\r'; 
+                nmea_buffer[nmea_buffer_index + 1] = '\n'; 
+                nmea_buffer[nmea_buffer_index + 2] = '\0'; 
+
+                nmea_buffer_index = 0; // for receiving the next NMEA string
+
+                if(send_buffer_locked) {
+                    // there's already a string being sent by the UART, so
+                    // set the flag so that the TXIF interrupt will send out
+                    // this string as soon as it's able to.
+                    nmea_buffer_ready = 1;
+                } else {
+                    // the UART isn't busy, so the NMEA string can be sent now
+                    uart_send_str(nmea_buffer);
+                    nmea_buffer_ready = 0;
+                }    
+            }  
         } else {
             nmea_buffer_index++;
         }
@@ -156,7 +163,7 @@ static void interrupt isr(void) {
                 // every 5 seconds
                 unsigned int seconds = (of_since_alert * 262) / 500; // 0.524288
                 
-                sprintf(alert_buffer, "@ALERT-%c-%d\r\n", panic_type, seconds); // 10 = seconds since alert
+                sprintf(alert_buffer, "@PANIC-%c-%d\r\n", panic_type, seconds); // 10 = seconds since alert
                 if(send_buffer_locked) {
                     // there's already a string being sent by the UART, so
                     // set the flag so that the TXIF interrupt will send out
@@ -233,7 +240,8 @@ int main() {
     
     TMR0IE = 1; // enable timer0 overflow interrupt
     OPTION_REG = 0x07; // TIMER0 prescaler = 256
-    OPTION_REGbits.INTEDG = 0; // INT on falling edge
+    //OPTION_REGbits.INTEDG = 0; // INT on falling edge
+    OPTION_REGbits.INTEDG = 1; // INT on rising edge
     INTE = 1; // enable INT external interrupt
     
     // CM1 
@@ -412,7 +420,7 @@ void start_panicing(char pt) {
     }
     
     panic_type = pt;
-    sprintf(alert_buffer, "@ALERT-%c-0\r\n", panic_type); // 0 = seconds since alert
+    sprintf(alert_buffer, "@PANIC-%c-0\r\n", panic_type); // 0 = seconds since alert
     alert_occurred = 1;
     of_since_alert = 0;
     TMR0 = 0; 
