@@ -11,7 +11,7 @@
  *  RA1/AN1 - accelerometer Z
  *  RA2/AN2 - accelerometer Y
  *  RA3/AN3 - accelerometer X
- *  RB0 - button (normally high)
+ *  RB0 - button (normally low)
  *  RB1 - hardware RX (to GPS TX)
  *  RB2 - hardware TX (to transceiver RX)
  *  RB3 - software TX (to GPS RX)
@@ -125,8 +125,6 @@ static void interrupt isr(void) {
         }
     }
     
-    // only the interrupt is allowed to decide when to send data. 
-    
     if(TXIF) {
         if(send_buffer_locked) {
             // send next character
@@ -189,7 +187,6 @@ static void interrupt isr(void) {
     
     if(INTF) {
         // button pressed
-        NOP();
         start_panicing('B'); // button panic
         INTF = 0;
     }
@@ -207,7 +204,8 @@ static void interrupt isr(void) {
     }
 }
 
-__CONFIG(WDTE_OFF);
+
+__CONFIG(WDTE_OFF); // disable watchdog timer
 
 int main() {
     OSCCONbits.IRCF = 0b0111; // 500 kHz clock 
@@ -272,7 +270,7 @@ int main() {
     PEIE = 1; // enables all active peripheral interrupts
     
     int x, y, z, sum;
-    char za, ya, xa;
+    char za, ya, xa; // vars used to debug
     
     while(1) {
         // assuming 255 is +16G and 0 is -16G for each axis
@@ -294,9 +292,6 @@ int main() {
         __delay_ms(1);
     }
 
-    // TODO: write a while loop to determine max counts of a counter that
-    // the program is in an interrupt for
-    
     return (EXIT_SUCCESS);
 }
 
@@ -331,11 +326,12 @@ void configure_gps() {
                 }
                
                 while(!RCIF);
-                // nmea_buffer refister 
+
                 c = RCREG;
                 if(c != gps_acks[i][j]) {
+                    // not a valid acknowledgment
                     acknowledged = 0;
-                    // wait for rest of back ACK to flood in
+                    // wait for rest of bad ACK to flood in
                     __delay_ms(100); 
                     break;
                 }       
